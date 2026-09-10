@@ -110,7 +110,7 @@ static const uint8_t user_code_b[] = {
      * Retry with SYS_YIELD when queue is empty.
      */
     0x85, 0xC0,                          /* test eax, eax */
-    0x78, 0xEA,                          /* js retry */
+    0x78, 0xEB,                          /* js retry */
 
     /*
      * Write exactly the number of received bytes.
@@ -133,7 +133,7 @@ static const uint8_t user_code_b[] = {
      */
     0xB8, 0x02, 0x00, 0x00, 0x00,       /* mov eax, 2 */
     0xCD, 0x80,                          /* int 0x80 */
-    0xEB, 0xD6                           /* jmp retry */
+    0xEB, 0xD7                           /* jmp retry */
 };
 
 static int setup_user_task(

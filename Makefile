@@ -10,7 +10,7 @@ OBJS = boot/boot.o \
        kernel/pmm.o kernel/kmalloc.o kernel/paging.o kernel/page_fault.o kernel/vmm.o \
        kernel/address_space.o kernel/task.o kernel/task_asm.o \
        kernel/syscall.o kernel/ipc.o kernel/uaccess.o kernel/initrd.o \
-       kernel/user_test.o kernel/user_mode.o kernel/kmain.o
+       kernel/user_test.o kernel/user_mode.o kernel/kmain.o kernel/elf.o
 
 BIN = firstos.bin
 ISO = firstos.iso
@@ -39,8 +39,8 @@ kernel/%.o: kernel/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 initrd.img: user_prog.s
-	$(CC) -m32 -ffreestanding -nostdlib -no-pie -e _start -Wl,-Ttext=0x40000000 user_prog.s -o user_prog.elf
-	objcopy -O binary --only-section=.text user_prog.elf initrd.img
+	$(CC) -m32 -ffreestanding -nostdlib -no-pie -e _start -Wl,--build-id=none -Wl,-T,user.ld user_prog.s -o user_prog.elf
+	cp user_prog.elf initrd.img
 
 iso: $(BIN) initrd.img
 	mkdir -p iso/boot/grub

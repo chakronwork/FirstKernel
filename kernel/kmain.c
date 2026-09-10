@@ -1,3 +1,4 @@
+#include "elf.h"
 #include "multiboot.h"
 #include "initrd.h"
 #include <stdint.h>
@@ -15,7 +16,6 @@
 #include "address_space.h"
 #include "task.h"
 #include "serial.h"
-#include "user_test.h"
 #include "ipc.h"
 
 
@@ -2860,81 +2860,10 @@ void kmain(uint32_t magic, uint32_t mbi_addr)
 
     /*
      * ==================================================
-     * Create task A
-     * ==================================================
-     */
-    uint32_t task_a_id =
-        task_create(
-            task_a_entry,
-            0
-        );
-
-
-    if (
-        task_a_id == 0
-    ) {
-
-        console_set_color(
-            VGA_LRED,
-            VGA_BLACK
-        );
-
-        console_write(
-            "[fail] task A creation\n"
-        );
-
-        serial_write(
-            "[fail] task A creation\n"
-        );
-
-        halt_cpu();
-    }
-
-
-    /*
-     * ==================================================
-     * Create task B
-     * ==================================================
-     */
-    uint32_t task_b_id =
-        task_create(
-            task_b_entry,
-            0
-        );
-
-
-    if (
-        task_b_id == 0
-    ) {
-
-        console_set_color(
-            VGA_LRED,
-            VGA_BLACK
-        );
-
-        console_write(
-            "[fail] task B creation\n"
-        );
-
-        serial_write(
-            "[fail] task B creation\n"
-        );
-
-        halt_cpu();
-    }
-
-
-    console_set_color(
-        VGA_LGREEN,
-        VGA_BLACK
-    );
-
-
-    /*
-     * ==================================================
      * Create idle task
      * ==================================================
      */
+
     uint32_t task_idle_id =
         task_create(
             task_idle_entry,
@@ -2944,7 +2873,6 @@ void kmain(uint32_t magic, uint32_t mbi_addr)
     if (
         task_idle_id == 0
     ) {
-
         console_set_color(
             VGA_LRED,
             VGA_BLACK
@@ -2961,26 +2889,13 @@ void kmain(uint32_t magic, uint32_t mbi_addr)
         halt_cpu();
     }
 
-
-    console_write(
-        "[ ok ] task A created\n"
-    );
-
-    console_write(
-        "[ ok ] task B created\n"
+    console_set_color(
+        VGA_LGREEN,
+        VGA_BLACK
     );
 
     console_write(
         "[ ok ] idle task created\n"
-    );
-
-
-    serial_write(
-        "[ ok ] task A created\n"
-    );
-
-    serial_write(
-        "[ ok ] task B created\n"
     );
 
     serial_write(
@@ -2990,49 +2905,123 @@ void kmain(uint32_t magic, uint32_t mbi_addr)
 
     /*
      * ==================================================
-     * Start cooperative scheduler
+     * Load /bin/init from initrd
      * ==================================================
      */
+
     console_set_color(
         VGA_YELLOW,
         VGA_BLACK
     );
 
     console_write(
-        "[test] starting sleep/block/wakeup scheduler\n"
+        "[test] loading /bin/init\n"
     );
 
     serial_write(
-        "[test] starting sleep/block/wakeup scheduler\n"
+        "[test] loading /bin/init\n"
+    );
+
+    uint32_t initrd_start =
+        initrd_get_start();
+
+    uint32_t initrd_size =
+        initrd_get_size();
+
+    if (
+        initrd_start == 0 ||
+        initrd_size == 0
+    ) {
+        console_set_color(
+            VGA_LRED,
+            VGA_BLACK
+        );
+
+        console_write(
+            "[fail] /bin/init initrd unavailable\n"
+        );
+
+        serial_write(
+            "[fail] /bin/init initrd unavailable\n"
+        );
+
+        halt_cpu();
+    }
+
+    int init_pid =
+        elf_spawn(
+            (const void *)(uintptr_t)initrd_start,
+            initrd_size
+        );
+
+    if (
+        init_pid <= 0
+    ) {
+        console_set_color(
+            VGA_LRED,
+            VGA_BLACK
+        );
+
+        console_write(
+            "[fail] ELF /bin/init spawn\n"
+        );
+
+        serial_write(
+            "[fail] ELF /bin/init spawn\n"
+        );
+
+        halt_cpu();
+    }
+
+    console_set_color(
+        VGA_LGREEN,
+        VGA_BLACK
+    );
+
+    console_write(
+        "[ ok ] /bin/init ELF loaded\n"
+    );
+
+    serial_write(
+        "[ ok ] /bin/init ELF loaded\n"
+    );
+
+    serial_write(
+        "[info] /bin/init pid: "
+    );
+
+    serial_write_dec(
+        (uint32_t)init_pid
+    );
+
+    serial_write(
+        "\n"
     );
 
 
     /*
-     * This function transfers control to task A.
-     *
-     * The task test will eventually halt the CPU after
-     * both tasks have returned.
-     */
-    /*
      * ==================================================
-     * Part 20.3
-     * Ring 3 transition test
+     * Start scheduler
      * ==================================================
-     *
-     * This must run before task_start().
-     * task_start() transfers control to the scheduler
-     * and does not return during normal operation.
      */
-    if (
-        user_test_init()
-    ) {
-        user_test_start();
-    }
+
+    console_set_color(
+        VGA_YELLOW,
+        VGA_BLACK
+    );
+
+    console_write(
+        "[test] starting scheduler\n"
+    );
+
+    serial_write(
+        "[test] starting scheduler\n"
+    );
+
 
     if (
         !task_start()
     ) {
-
         console_set_color(
             VGA_LRED,
             VGA_BLACK
@@ -3051,9 +3040,9 @@ void kmain(uint32_t magic, uint32_t mbi_addr)
 
 
     /*
-     * Normally never reached in this prototype because
-     * the final DEAD task halts the CPU.
+     * Normally never reached.
      */
+
     console_set_color(
         VGA_LRED,
         VGA_BLACK
