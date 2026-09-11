@@ -38,8 +38,10 @@ kernel/user_mode.o: kernel/user_mode.s
 kernel/%.o: kernel/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-initrd.img: user_prog.s
-	$(CC) -m32 -ffreestanding -nostdlib -no-pie -e _start -Wl,--build-id=none -Wl,-T,user.ld user_prog.s -o user_prog.elf
+USER_SRCS = user/crt0.s user/ulib.c user/main.c
+
+initrd.img: $(USER_SRCS) user.ld
+	$(CC) -m32 -ffreestanding -O2 -nostdlib -no-pie -fno-stack-protector -fno-pie -mno-red-zone -Iuser -Wl,--build-id=none -Wl,-T,user.ld $(USER_SRCS) -o user_prog.elf
 	cp user_prog.elf initrd.img
 
 iso: $(BIN) initrd.img

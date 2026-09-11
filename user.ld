@@ -8,6 +8,9 @@ SECTIONS
     {
         *(.text*)
         *(.rodata*)
+        *(.data*)
+        *(.bss*)
+        *(COMMON)
     }
 
     /DISCARD/ :
@@ -15,7 +18,5 @@ SECTIONS
         *(.comment)
         *(.note*)
         *(.eh_frame)
-        *(.data*)
-        *(.bss*)
     }
 }
