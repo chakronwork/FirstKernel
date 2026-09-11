@@ -1,285 +1,1392 @@
 # firstOS
 
-firstOS is a small x86 operating system kernel built as a learning project. It is not a full desktop OS or a polished production kernel. Instead, it is a hands-on experiment in low-level programming: booting a machine, entering protected mode, setting up basic infrastructure, and gradually building a tiny kernel that can print text, handle interrupts, and manage physical memory.
+A small 32-bit x86 operating system kernel developed as a low-level systems programming and operating systems research project.
 
-The project is intentionally simple and direct. It uses a custom linker script, raw assembly stubs, minimal C code, and QEMU for testing. If you are learning how operating systems actually start up, this project is a good place to see the real pieces come together.
+firstOS is designed to explore the fundamental components of an operating system, including bootstrapping, protected mode, interrupt handling, physical and virtual memory management, task scheduling, user-mode execution, system calls, inter-process communication, executable loading, and basic user-space interaction.
 
-## Why this project exists
+The project is intentionally small and self-contained so that the relationship between hardware, kernel code, memory, privilege levels, and user-space programs remains visible.
 
-This repository was created to explore how an OS kernel comes to life from the very first instruction executed by the CPU.
+> **Project status:** Active development
+> **Target architecture:** 32-bit x86
+> **Execution environment:** QEMU / Multiboot-compatible boot environments
+> **Kernel language:** C and x86 assembly
+> **License:** MIT
 
-A lot of beginner projects stop at “hello world,” but an operating system starts much earlier:
+---
 
-- The machine boots in real mode
-- A bootloader loads the kernel image
-- The kernel is mapped into memory at a known address
-- Protected mode is enabled
-- Segments and interrupt tables are set up
-- Device drivers are initialized
-- The kernel enters a continuous loop and waits for work
+# ภาษาไทย
 
-firstOS is a compact version of that process. It does not try to be fancy. It focuses on the foundation and keeps the code readable enough for learning.
+## ภาพรวม
 
-## What the kernel does right now
+firstOS เป็นโครงการพัฒนาเคอร์เนลระบบปฏิบัติการขนาดเล็กสำหรับสถาปัตยกรรม x86 แบบ 32 บิต โดยมีวัตถุประสงค์หลักเพื่อศึกษาการทำงานของระบบปฏิบัติการตั้งแต่ระดับการบูตเครื่อง ไปจนถึงการจัดการหน่วยความจำ การจัดตารางงาน การทำงานใน Ring 3 และการเรียกใช้บริการของเคอร์เนลผ่าน system call
 
-At the moment, the project includes a set of core kernel features that are common in early-stage OS development:
+โครงการนี้ไม่ได้มีเป้าหมายเป็นระบบปฏิบัติการสำหรับใช้งานทั่วไป แต่เน้นการสร้างส่วนประกอบของ kernel ขึ้นมาทีละส่วน พร้อมทดสอบพฤติกรรมของแต่ละระบบในสภาพแวดล้อมที่ควบคุมได้
 
-- Multiboot 1 boot entry
-- 32-bit x86 kernel startup
-- VGA text-mode console output
-- Global Descriptor Table (GDT) initialization
-- Interrupt Descriptor Table (IDT) setup
-- PIC remapping for IRQ handling
-- PIT timer setup
-- Keyboard interrupt support
-- Physical memory manager (PMM)
-- Simple command loop in the kernel
+---
 
-This means the kernel is already capable of booting, printing status information, initializing hardware, allocating physical pages, and reading keyboard input in a very basic loop.
+## เป้าหมายของโครงการ
 
-## Project structure
+เป้าหมายหลักของ firstOS คือการสร้างระบบปฏิบัติการขนาดเล็กที่สามารถแสดงลำดับการทำงานตั้งแต่:
 
 ```text
-firstos/
+Boot
+  |
+  v
+Multiboot
+  |
+  v
+Kernel Initialization
+  |
+  +--> GDT
+  |
+  +--> IDT
+  |
+  +--> PIC / PIT
+  |
+  +--> Physical Memory Manager
+  |
+  +--> Paging / Virtual Memory
+  |
+  +--> Address Spaces
+  |
+  +--> Task Scheduler
+  |
+  +--> User Mode / Ring 3
+  |
+  +--> System Calls
+  |
+  +--> IPC
+  |
+  +--> User Program / Shell
+```
+
+แนวทางนี้ช่วยให้โครงสร้างของ operating system สามารถศึกษาได้ตั้งแต่ระดับ hardware interface ไปจนถึง user-space execution
+
+---
+
+## ความสามารถปัจจุบัน
+
+ปัจจุบัน repository มีส่วนประกอบหลักดังต่อไปนี้
+
+### Boot and Kernel Initialization
+
+* Multiboot 1 kernel entry
+* 32-bit x86 protected mode
+* Kernel linker script
+* Kernel entry point
+* Multiboot information parsing
+* Multiboot module support
+* Initrd registration
+
+### CPU and Interrupt Management
+
+* Global Descriptor Table (GDT)
+* Interrupt Descriptor Table (IDT)
+* Programmable Interrupt Controller (PIC)
+* Programmable Interval Timer (PIT)
+* CPU exception handling
+* Hardware interrupt handling
+* IRQ-based scheduling
+
+### Console and Debugging
+
+* VGA text-mode console
+* VGA hardware cursor
+* Serial console output
+* Hexadecimal and decimal diagnostic output
+* Kernel boot diagnostics
+
+### Physical Memory
+
+* Physical Memory Manager (PMM)
+* Physical page allocation
+* Physical page release
+* Multiboot memory information
+* Kernel heap allocator
+* Kernel heap validation
+* Heap stress testing
+
+### Virtual Memory
+
+* Paging
+* Page tables
+* Virtual Memory Manager (VMM)
+* Page fault handling
+* Address space abstraction
+* Per-task address spaces
+* User-accessible page mappings
+
+### Task Management
+
+* Static task table
+* Task creation
+* Task states:
+
+  * `UNUSED`
+  * `READY`
+  * `RUNNING`
+  * `BLOCKED`
+  * `DEAD`
+* Task switching
+* Preemptive scheduling
+* PIT-driven scheduler ticks
+* Task sleeping
+* Task waking
+* Idle task
+* User task support
+
+The current task subsystem supports up to 32 task slots and maintains dedicated task context and user-mode execution state.
+
+### User Mode and Privilege Separation
+
+firstOS supports execution of user programs in Ring 3.
+
+The kernel maintains separate execution information for user tasks, including:
+
+* user entry address
+* user stack
+* kernel stack
+* user address space
+* user code mapping
+* user-owned physical pages
+
+This allows the kernel to distinguish kernel-mode execution from user-mode execution.
+
+### System Calls
+
+System calls are dispatched through the kernel syscall layer.
+
+Current syscall identifiers are:
+
+| Number | Name           | Purpose                           |
+| ------ | -------------- | --------------------------------- |
+| 1      | `SYS_WRITE`    | Write data from user space        |
+| 2      | `SYS_YIELD`    | Yield the CPU                     |
+| 3      | `SYS_EXIT`     | Terminate the current user task   |
+| 4      | `SYS_SLEEP`    | Sleep for a number of timer ticks |
+| 5      | `SYS_IPC_SEND` | Send an IPC message               |
+| 6      | `SYS_IPC_RECV` | Receive an IPC message            |
+| 7      | `SYS_READ`     | Read input into user memory       |
+
+These interfaces are implemented in `kernel/syscall.c` and declared in `include/syscall.h`.
+
+### User Memory Access
+
+The kernel includes explicit user-memory validation mechanisms for system calls.
+
+For example, `SYS_WRITE` validates user-space buffers before copying data into kernel space, while `SYS_READ` validates writable user memory before copying input back to the user process.
+
+This separation is important because a kernel must not blindly trust pointers supplied by Ring 3 code.
+
+### Inter-Process Communication
+
+The kernel provides an initial IPC interface through:
+
+```text
+SYS_IPC_SEND
+SYS_IPC_RECV
+```
+
+IPC is integrated into the syscall layer and is intended to provide communication between tasks and future user-space processes.
+
+### ELF Support
+
+The repository includes an initial ELF32 executable loader.
+
+The loader currently validates:
+
+* ELF magic
+* 32-bit class
+* little-endian format
+* executable file type
+* x86 architecture
+* ELF version
+* ELF header size
+* program-header size
+
+It also contains functionality for mapping loadable ELF segments into a task address space and creating a user stack.
+
+The project therefore has the foundation for executing externally prepared user-space ELF programs rather than embedding every user program directly into kernel source code.
+
+### Initrd
+
+The first Multiboot module is treated as the initrd image.
+
+The kernel obtains:
+
+```text
+module start
+module end
+module size
+```
+
+from the Multiboot information structure and registers the module before starting user-space execution.
+
+The Makefile currently builds `user_prog.elf` and copies it to `initrd.img`, which is then passed to GRUB or QEMU as a Multiboot module.
+
+---
+
+# สถาปัตยกรรมโดยรวม
+
+โครงสร้างของ firstOS แบ่งออกเป็นชั้นหลักดังนี้
+
+```text
+Hardware
+    |
+    v
+Boot / Multiboot
+    |
+    v
+CPU Initialization
+    |
+    +-- GDT
+    +-- IDT
+    +-- PIC
+    +-- PIT
+    |
+    v
+Memory Subsystem
+    |
+    +-- PMM
+    +-- Paging
+    +-- VMM
+    +-- Address Space
+    +-- Kernel Heap
+    |
+    v
+Task Subsystem
+    |
+    +-- Task Creation
+    +-- Context Switching
+    +-- Scheduler
+    +-- Sleep / Wake
+    |
+    v
+Protection Boundary
+    |
+    +-- Ring 0
+    |
+    +-- Ring 3
+    |
+    v
+System Call Layer
+    |
+    +-- SYS_WRITE
+    +-- SYS_READ
+    +-- SYS_YIELD
+    +-- SYS_SLEEP
+    +-- SYS_EXIT
+    +-- SYS_IPC_SEND
+    +-- SYS_IPC_RECV
+    |
+    v
+User Space
+    |
+    +-- User Program
+    +-- User Shell
+    +-- ELF Executable
+```
+
+---
+
+# โครงสร้าง repository
+
+โครงสร้างหลักของ repository ในปัจจุบันประกอบด้วย:
+
+```text
+Firstkernel/
 ├── boot/
 │   └── boot.s
+│
 ├── include/
+│   ├── address_space.h
 │   ├── console.h
+│   ├── elf.h
 │   ├── gdt.h
 │   ├── idt.h
+│   ├── initrd.h
+│   ├── ipc.h
 │   ├── keyboard.h
+│   ├── kmalloc.h
+│   ├── multiboot.h
+│   ├── page_fault.h
+│   ├── paging.h
 │   ├── pic.h
 │   ├── pmm.h
+│   ├── serial.h
+│   ├── syscall.h
+│   ├── task.h
 │   ├── timer.h
-│   └── vga.h
+│   ├── tss.h
+│   ├── uaccess.h
+│   ├── user_test.h
+│   ├── vga.h
+│   └── vmm.h
+│
 ├── kernel/
+│   ├── address_space.c
 │   ├── console.c
+│   ├── elf.c
 │   ├── gdt.c
 │   ├── gdt.s
 │   ├── idt.c
 │   ├── idt.s
+│   ├── initrd.c
+│   ├── ipc.c
 │   ├── keyboard.c
+│   ├── kmalloc.c
 │   ├── kmain.c
+│   ├── page_fault.c
+│   ├── paging.c
 │   ├── pic.c
 │   ├── pmm.c
+│   ├── serial.c
+│   ├── syscall.c
+│   ├── task.c
+│   ├── task_asm.s
 │   ├── timer.c
-│   └── vga.c
-├── boot.s
-├── LICENSE
-├── Makefile
-├── README.md
+│   ├── tss.c
+│   ├── uaccess.c
+│   ├── user_mode.s
+│   ├── user_test.c
+│   ├── vga.c
+│   └── vmm.c
+│
+├── user_prog.s
+├── user.ld
 ├── linker.ld
-└── ...
+├── Makefile
+├── LICENSE
+├── SECURITY.md
+└── README.md
 ```
 
-### Main parts
+---
 
-#### boot/
-This folder contains the very first stage of the kernel boot process. The assembly file sets up the stack and jumps into the C kernel entry point.
+# Boot Flow
 
-#### include/
-These are header files that define the kernel interfaces, device constants, and data structure declarations for VGA, GDT, IDT, PIC, timer, keyboard, and physical memory management.
+ลำดับการเริ่มต้นระบบโดยสรุป:
 
-#### kernel/
-This is the heart of the OS. Here you will find the implementation of the console, interrupt handling, memory setup, timer logic, keyboard scanning, and the kernel main loop.
+1. Multiboot-compatible loader โหลด kernel
+2. `boot/boot.s` เริ่มต้นการทำงาน
+3. Kernel stack ถูกจัดเตรียม
+4. เข้าสู่ `kmain`
+5. ตรวจสอบ Multiboot magic
+6. เริ่มต้น serial console
+7. เริ่มต้น VGA console
+8. อ่าน Multiboot modules
+9. ลงทะเบียน initrd
+10. โหลด GDT
+11. โหลด IDT
+12. ตั้งค่า PIC
+13. ตั้งค่า PIT
+14. เริ่มระบบ keyboard
+15. เริ่ม PMM
+16. เริ่ม kernel heap
+17. เริ่ม paging / virtual memory
+18. เริ่ม task subsystem
+19. สร้าง kernel tasks
+20. เตรียม user-space tasks
+21. เปิดใช้งาน interrupt
+22. scheduler เริ่มทำงาน
+23. user-space สามารถเข้าสู่ Ring 3 และเรียก system calls
 
-#### linker.ld
-This file defines the kernel memory layout. It places the kernel at the correct virtual/physical address and organizes `.text`, `.data`, `.bss`, and other sections.
+---
 
-#### Makefile
-The build script compiles the assembly and C sources into a 32-bit kernel binary and provides commands to run it in QEMU.
+# Memory Model
 
-## Boot flow
+firstOS ใช้โครงสร้างหน่วยความจำหลายระดับ:
 
-The boot process is straightforward but important:
+```text
+Physical Memory
+      |
+      v
+Physical Memory Manager
+      |
+      v
+Page Frames
+      |
+      v
+Paging
+      |
+      v
+Virtual Address Space
+      |
+      +------------------+
+      |                  |
+      v                  v
+   Kernel Space       User Space
+                         |
+                         v
+                    User Process
+```
 
-1. The system loads the kernel image using a Multiboot-compatible bootloader.
-2. The entry point in `boot/boot.s` starts execution.
-3. A stack is set up.
-4. `kmain` is called with the Multiboot magic value and pointer information.
-5. The kernel verifies the Multiboot header.
-6. Console output is initialized so the system can print status messages.
-7. The GDT is installed.
-8. The IDT is configured.
-9. PIC is remapped for IRQs.
-10. The PIT timer is initialized.
-11. Keyboard interrupts are enabled.
-12. The physical memory manager starts tracking pages.
-13. The kernel prints memory statistics and tests page allocation.
-14. Interrupts are enabled.
-15. The kernel enters a command loop and waits for input.
+Kernel linker script กำหนดให้ kernel image เริ่มต้นที่ address `1 MiB` และแยก section หลัก เช่น `.text`, `.rodata`, `.data` และ `.bss` อย่างชัดเจน
 
-That is exactly the shape of a very early OS kernel: initialize hardware, build the skeleton, then keep running.
+---
 
-## Memory model and architecture
+# Task and Scheduler Model
 
-This project targets x86 in 32-bit protected mode. That is a classic educational choice because it makes the main concepts easier to see:
+Task subsystem ใช้ task table แบบคงที่และรองรับ task สูงสุด 32 ตัวใน configuration ปัจจุบัน
 
-- segmentation via GDT
-- interrupt handling via IDT
-- memory page tracking via PMM
-- direct hardware interaction via port I/O
+สถานะของ task:
 
-The kernel is built with `-m32` and `-ffreestanding`, which means it does not depend on libc or a hosted runtime environment. It is designed to run in a bare-metal environment, not as a normal Linux or Windows user program.
+```text
+UNUSED
+READY
+RUNNING
+BLOCKED
+DEAD
+```
 
-## GDT and IDT
+Scheduler ใช้ PIT timer interrupt เป็นส่วนหนึ่งของกลไก preemption ทำให้ task สามารถถูกสลับออกจาก CPU ได้แม้ task นั้นจะไม่ได้เรียก `yield()` ด้วยตัวเอง
 
-The Global Descriptor Table (GDT) is one of the first low-level structures a kernel sets up. It describes code and data segments, which is necessary before the CPU can correctly execute protected mode code.
+ระบบยังมี:
 
-The Interrupt Descriptor Table (IDT) enables the kernel to define handlers for exceptions and interrupts. These handlers are essential for:
+* sleeping task
+* wake-up tick
+* idle task
+* kernel task
+* user-mode task
+* task-specific address space
 
-- CPU exceptions
-- timer interrupts
-- keyboard interrupts
-- more advanced device and system events later on
+---
 
-The project already wires in these structures and loads them during startup.
+# User Program
 
-## VGA console
+user-space program ปัจจุบันถูกสร้างจาก `user_prog.s`
 
-The VGA text-mode console is one of the most important early features in a kernel. It gives the system a way to output information before any higher-level UI or terminal exists.
+ตัวอย่างการทำงานพื้นฐาน:
 
-The console implementation uses standard VGA memory layout and writes characters directly to the screen buffer. This makes debugging much easier because you can print status messages like:
+```text
+User Program
+    |
+    +-- SYS_WRITE
+    |
+    +-- SYS_READ
+    |
+    +-- Parse input
+    |
+    +-- help
+    |
+    +-- unknown command
+```
 
-- multiboot verification passed
-- GDT loaded
-- IDT loaded
-- keyboard ready
-- memory manager initialized
+ตัวโปรแกรมมี shell loop พื้นฐานและรองรับคำสั่ง `help` ในระดับต้น โดยเรียกบริการของ kernel ผ่าน `int 0x80` แทนการเข้าถึง kernel โดยตรง
 
-This is often the first sign that a bare-metal kernel is alive.
+---
 
-## Physical memory manager
+# Building
 
-The project includes a minimal physical memory manager. This is a critical part of any kernel because the OS needs a way to know:
+## Requirements
 
-- how much physical memory exists
-- which pages are free
-- which pages are already allocated
-- how to allocate frames for future tasks or drivers
+สภาพแวดล้อมสำหรับ build โดยทั่วไปต้องมี:
 
-The `pmm_init` flow in the kernel reads the Multiboot information structure, initializes the memory map, and then starts tracking free pages.
+* GCC
+* GNU binutils / linker
+* QEMU
+* GRUB tools สำหรับการสร้าง ISO
+* ระบบ Linux ที่รองรับ 32-bit compilation
 
-The code also performs a simple allocation test:
+Makefile ปัจจุบันใช้:
 
-- allocate a page
-- allocate another page
-- confirm success
-- free both pages again
+```text
+-m32
+-ffreestanding
+-fno-stack-protector
+-fno-pie
+-mno-red-zone
+```
 
-This is a very small but meaningful example of memory management in a kernel.
+และ link kernel แบบ freestanding โดยไม่พึ่งพา libc
 
-## Interrupt and timer handling
+---
 
-The project initializes the Programmable Interrupt Controller (PIC) and the Programmable Interval Timer (PIT):
-
-- PIC remapping moves IRQs to a stable range in the IDT
-- PIT sets a known timer frequency
-- keyboard interrupts are enabled on IRQ1
-
-This gives the kernel a basic mechanism for handling asynchronous events. As the project grows, more drivers can be added around this interrupt model.
-
-## Keyboard input loop
-
-Once the system is initialized, the kernel enters a simple loop that waits for keyboard input. This is a small but important milestone because it demonstrates that the kernel can now interact with hardware beyond just printing boot output.
-
-The flow is intentionally basic:
-
-- read characters from the keyboard buffer
-- store them in a command array
-- print the received text back to the screen
-- display a shell prompt again
-
-This is not a full shell yet, but it is the beginning of user interaction and command processing.
-
-## Build and run
-
-The project is built with `make`, using a GCC-based toolchain for 32-bit freestanding code.
-
-### Requirements
-
-You will typically need:
-
-- GCC
-- GNU ld
-- QEMU (`qemu-system-i386`)
-- GRUB tools if you want to build an ISO image
-- A 32-bit cross-toolchain is optional depending on your local setup, but the project is written to compile as a freestanding 32-bit kernel
-
-### Build kernel
+# Build Kernel
 
 ```bash
 make
 ```
 
-This produces the kernel binary `firstos.bin`.
+ผลลัพธ์หลัก:
 
-### Run in QEMU
+```text
+firstos.bin
+```
+
+---
+
+# Run with QEMU
 
 ```bash
 make run
 ```
 
-This launches the kernel in QEMU using the `-kernel` option.
+คำสั่งนี้จะ build dependency ที่จำเป็นสำหรับ `initrd.img` และเรียก:
 
-### Build ISO image
+```bash
+qemu-system-i386 -kernel firstos.bin -initrd initrd.img -serial stdio
+```
+
+ตามที่กำหนดไว้ใน Makefile ปัจจุบัน
+
+---
+
+# Build ISO
 
 ```bash
 make iso
 ```
 
-This creates a bootable ISO using GRUB.
+คำสั่งนี้จะ:
 
-### Clean build artifacts
+1. build kernel
+2. build user program
+3. สร้าง `initrd.img`
+4. สร้าง GRUB configuration
+5. สร้าง bootable ISO ด้วย `grub-mkrescue`
+
+ผลลัพธ์:
+
+```text
+firstos.iso
+```
+
+---
+
+# Clean
 
 ```bash
 make clean
 ```
 
-## Build conventions
+ลบ build artifacts รวมถึง:
 
-The Makefile is intentionally simple:
+```text
+*.o
+firstos.bin
+firstos.iso
+user_prog.elf
+initrd.img
+iso/
+```
 
-- compile all `.c` files with `-m32 -ffreestanding`
-- assemble `.s` files with GCC as assembler
-- link them using a custom linker script
-- produce a raw kernel binary
+---
 
-This keeps the project close to how bare-metal kernels are traditionally built without relying on a large build system.
+# Debugging
 
-## Why this project is useful
+firstOS มี serial output สำหรับตรวจสอบสถานะของ kernel ระหว่าง boot และ runtime
 
-Even though this is a tiny kernel, it teaches several important concepts that appear in all serious OS projects:
+ตัวอย่างข้อมูลที่ kernel สามารถรายงาน:
 
-- how the CPU starts in a bare environment
-- how execution enters C from assembly
-- how memory is laid out
-- how the kernel initializes hardware
-- how interrupts are managed
-- how the system moves from boot to a running environment
+```text
+[ ok ] multiboot verified
+[ ok ] kernel console ready
+[ ok ] initrd module loaded
+[info] initrd start: ...
+[info] initrd size: ...
+```
 
-This makes it a very useful project for understanding the foundations of operating systems.
+ระบบ serial และ VGA console ถูกใช้งานคู่กันเพื่อให้ง่ายต่อการตรวจสอบปัญหาที่เกิดขึ้นก่อนที่ระบบ user-space จะเริ่มทำงาน
 
-## Current status and roadmap
+---
 
-This is still an educational kernel in active development. It has already reached the stage where the kernel boots, initializes a basic console, configures the GDT and IDT, starts the timer and keyboard, and manages simple page allocation.
+# Current Development Status
 
-The next likely steps are:
+firstOS อยู่ในระหว่างการพัฒนาและยังไม่ควรถูกพิจารณาว่าเป็นระบบปฏิบัติการสำหรับ production
 
-- improve the command parser
-- add more system calls and kernel utilities
-- expand interrupt handling
-- implement paging and virtual memory
-- add a proper task or process model
-- build more drivers for hardware devices
-- create a real shell or user-space environment
+องค์ประกอบที่มีอยู่ใน repository แล้วครอบคลุมตั้งแต่ bootloader interface ไปจนถึง user-space execution แต่หลาย subsystem ยังอยู่ในขั้น experimental และยังจำเป็นต้องมีการทดสอบเพิ่มเติมในด้าน correctness, isolation, resource cleanup และ robustness
 
-## License
+---
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+# Known Limitations
 
-## Final note
+โครงการยังมีข้อจำกัดสำคัญ เช่น:
 
-firstOS is not trying to be a complete OS. It is a clear, low-level example of how an operating system kernel starts, initializes itself, and begins handling basic hardware. That makes it a great project for anyone who wants to understand the actual machinery behind the operating systems we use every day.
+* รองรับเฉพาะ x86 32-bit
+* ไม่ใช่ระบบปฏิบัติการสำหรับใช้งานทั่วไป
+* driver support ยังมีจำกัด
+* filesystem ยังไม่ใช่ระบบเต็มรูปแบบ
+* user-space API ยังอยู่ในช่วงเริ่มต้น
+* IPC ยังอยู่ในขั้นพื้นฐาน
+* ELF loader ยังอยู่ในระหว่างการพัฒนา
+* memory management ยังไม่มีคุณสมบัติระดับ production
+* hardware compatibility ยังจำกัด
+* security model ยังอยู่ในช่วงพัฒนา
 
-If you are learning kernel development, the best way to use this project is to read the code while it runs in QEMU, change a small piece, and observe how the system responds. That hands-on habit is where the real learning happens.
+ดังนั้นการรันบน hardware จริงควรถือเป็นขั้นทดลอง ไม่ใช่การใช้งานจริง
+
+---
+
+# Roadmap
+
+แนวทางการพัฒนาต่อที่เหมาะสมกับโครงสร้างปัจจุบัน ได้แก่:
+
+## Kernel
+
+* ปรับปรุง memory management
+* ปรับปรุง page fault handling
+* ปรับปรุง process/task lifecycle
+* ปรับปรุง resource cleanup
+* เพิ่ม kernel synchronization primitives
+* เพิ่ม timer abstraction
+* เพิ่ม driver architecture
+
+## User Space
+
+* ปรับปรุง ELF loader
+* เพิ่ม executable lifecycle
+* เพิ่ม process isolation
+* เพิ่ม standard user-space runtime
+* เพิ่ม shell command system
+* แยก user programs ออกจาก kernel test code
+
+## System Calls
+
+* ออกแบบ syscall ABI ให้มีเสถียรภาพมากขึ้น
+* เพิ่ม process management
+* เพิ่ม file abstraction
+* เพิ่ม memory mapping
+* เพิ่ม process identifiers
+* เพิ่ม system-level error handling
+
+## IPC
+
+* ปรับปรุง message queues
+* เพิ่ม synchronization
+* เพิ่ม process-to-process communication model
+* กำหนด IPC semantics ที่ชัดเจนขึ้น
+
+## Storage
+
+* เพิ่ม block device abstraction
+* เพิ่ม filesystem
+* รองรับ executable loading จาก storage
+* พัฒนา virtual filesystem interface
+
+---
+
+# Design Principles
+
+firstOS เน้นหลักการดังต่อไปนี้:
+
+### 1. Small and Understandable
+
+ระบบควรมีขนาดเล็กพอที่จะศึกษาความสัมพันธ์ระหว่าง component ได้ทั้งระบบ
+
+### 2. Explicit Systems Programming
+
+โค้ดควรแสดงให้เห็นการทำงานของ CPU, memory และ interrupt อย่างชัดเจน โดยลด abstraction ที่ไม่จำเป็น
+
+### 3. Incremental Development
+
+พัฒนาทีละ subsystem พร้อมทดสอบก่อนขยายความสามารถ
+
+### 4. Kernel/User Separation
+
+สิทธิ์ของ kernel และ user-space ควรถูกแยกออกจากกันตั้งแต่ระดับ execution privilege และ memory mapping
+
+### 5. Testability
+
+แต่ละ subsystem ควรมี diagnostic output หรือ test path ที่ช่วยตรวจสอบพฤติกรรมได้
+
+---
+
+# License
+
+This project is licensed under the MIT License.
+
+See [LICENSE](LICENSE) for the full license text.
+
+---
+
+# Security
+
+Security-related information and the project's security policy are documented separately in [SECURITY.md](SECURITY.md).
+
+---
+
+# Repository
+
+Source code:
+
+https://github.com/chakronwork/Firstkernel
+
+---
+
+# English
+
+## Overview
+
+firstOS is a small 32-bit x86 operating system kernel developed as a low-level systems programming and operating systems research project.
+
+The project focuses on understanding how an operating system is built from the bottom up, including bootstrapping, CPU initialization, interrupt handling, physical and virtual memory management, task scheduling, privilege separation, system calls, IPC, executable loading, and basic user-space interaction.
+
+firstOS is not intended to be a production operating system. Its primary purpose is to provide a compact and understandable implementation of operating-system fundamentals.
+
+---
+
+## Project Goals
+
+The project aims to demonstrate the progression from machine startup to user-space execution:
+
+```text
+Boot
+  |
+  v
+Multiboot
+  |
+  v
+Kernel Initialization
+  |
+  +--> GDT
+  |
+  +--> IDT
+  |
+  +--> PIC / PIT
+  |
+  +--> Physical Memory Manager
+  |
+  +--> Paging / Virtual Memory
+  |
+  +--> Address Spaces
+  |
+  +--> Task Scheduler
+  |
+  +--> User Mode / Ring 3
+  |
+  +--> System Calls
+  |
+  +--> IPC
+  |
+  +--> User Program / Shell
+```
+
+---
+
+## Current Features
+
+### Boot and Kernel Initialization
+
+* Multiboot 1 kernel entry
+* 32-bit x86 protected mode
+* Custom kernel linker script
+* Kernel entry point
+* Multiboot information parsing
+* Multiboot module support
+* Initrd registration
+
+### CPU and Interrupt Management
+
+* Global Descriptor Table (GDT)
+* Interrupt Descriptor Table (IDT)
+* Programmable Interrupt Controller (PIC)
+* Programmable Interval Timer (PIT)
+* CPU exception handling
+* Hardware interrupt handling
+* IRQ-driven scheduling
+
+### Console and Debugging
+
+* VGA text-mode console
+* VGA hardware cursor
+* Serial console output
+* Diagnostic hexadecimal output
+* Diagnostic decimal output
+* Boot and runtime status logging
+
+### Physical Memory
+
+* Physical Memory Manager (PMM)
+* Physical page allocation
+* Physical page release
+* Multiboot memory information
+* Kernel heap allocator
+* Heap validation
+* Heap stress testing
+
+### Virtual Memory
+
+* Paging
+* Page tables
+* Virtual Memory Manager (VMM)
+* Page fault handling
+* Address space abstraction
+* Per-task address spaces
+* User-space page mappings
+
+### Task Management
+
+* Static task table
+* Task creation
+* Task switching
+* Preemptive scheduling
+* PIT-driven scheduler ticks
+* Task sleeping
+* Task waking
+* Idle task
+* Kernel tasks
+* User-mode tasks
+
+The task subsystem currently provides up to 32 task slots and keeps task-specific kernel and user execution state.
+
+### User Mode
+
+firstOS supports user-mode execution in Ring 3.
+
+User tasks maintain information including:
+
+* user entry address
+* user stack
+* kernel stack
+* address space
+* user code mapping
+* user-owned physical pages
+
+This provides the foundation for privilege separation between kernel-mode and user-mode execution.
+
+### System Calls
+
+The current syscall interface contains:
+
+| Number | Name           | Description                 |
+| ------ | -------------- | --------------------------- |
+| 1      | `SYS_WRITE`    | Write data from user space  |
+| 2      | `SYS_YIELD`    | Yield the CPU               |
+| 3      | `SYS_EXIT`     | Exit the current user task  |
+| 4      | `SYS_SLEEP`    | Sleep for timer ticks       |
+| 5      | `SYS_IPC_SEND` | Send an IPC message         |
+| 6      | `SYS_IPC_RECV` | Receive an IPC message      |
+| 7      | `SYS_READ`     | Read input into user memory |
+
+The syscall implementation is located in `kernel/syscall.c`, with the ABI declarations in `include/syscall.h`.
+
+### User Memory Validation
+
+The syscall layer validates user-space pointers before copying data across the privilege boundary.
+
+`SYS_WRITE` validates readable user memory before copying data to the kernel, while `SYS_READ` validates writable user memory before copying data back into user space.
+
+### Inter-Process Communication
+
+Initial IPC support is exposed through:
+
+```text
+SYS_IPC_SEND
+SYS_IPC_RECV
+```
+
+This subsystem provides the initial foundation for communication between tasks and future processes.
+
+### ELF Executable Support
+
+The repository includes an ELF32 executable loader.
+
+The loader validates:
+
+* ELF magic
+* 32-bit class
+* little-endian encoding
+* executable file type
+* x86 architecture
+* ELF version
+* ELF header size
+* program-header size
+
+It also contains code for mapping loadable segments into a task address space and preparing a user-mode stack.
+
+### Initrd
+
+The first Multiboot module is used as the initrd image.
+
+The kernel reads the module start and end addresses from the Multiboot information structure and registers the module before user-space initialization.
+
+The current Makefile builds `user_prog.elf`, copies it to `initrd.img`, and provides the resulting image to GRUB or QEMU as a Multiboot module.
+
+---
+
+# Architecture
+
+The major subsystems can be viewed as:
+
+```text
+Hardware
+    |
+    v
+Boot / Multiboot
+    |
+    v
+CPU Initialization
+    |
+    +-- GDT
+    +-- IDT
+    +-- PIC
+    +-- PIT
+    |
+    v
+Memory Subsystem
+    |
+    +-- PMM
+    +-- Paging
+    +-- VMM
+    +-- Address Space
+    +-- Kernel Heap
+    |
+    v
+Task Subsystem
+    |
+    +-- Task Creation
+    +-- Context Switching
+    +-- Scheduler
+    +-- Sleep / Wake
+    |
+    v
+Protection Boundary
+    |
+    +-- Ring 0
+    |
+    +-- Ring 3
+    |
+    v
+System Call Layer
+    |
+    +-- SYS_WRITE
+    +-- SYS_READ
+    +-- SYS_YIELD
+    +-- SYS_SLEEP
+    +-- SYS_EXIT
+    +-- SYS_IPC_SEND
+    +-- SYS_IPC_RECV
+    |
+    v
+User Space
+    |
+    +-- User Program
+    +-- User Shell
+    +-- ELF Executable
+```
+
+---
+
+# Repository Structure
+
+```text
+Firstkernel/
+├── boot/
+│   └── boot.s
+│
+├── include/
+│   ├── address_space.h
+│   ├── console.h
+│   ├── elf.h
+│   ├── gdt.h
+│   ├── idt.h
+│   ├── initrd.h
+│   ├── ipc.h
+│   ├── keyboard.h
+│   ├── kmalloc.h
+│   ├── multiboot.h
+│   ├── page_fault.h
+│   ├── paging.h
+│   ├── pic.h
+│   ├── pmm.h
+│   ├── serial.h
+│   ├── syscall.h
+│   ├── task.h
+│   ├── timer.h
+│   ├── tss.h
+│   ├── uaccess.h
+│   ├── user_test.h
+│   ├── vga.h
+│   └── vmm.h
+│
+├── kernel/
+│   ├── address_space.c
+│   ├── console.c
+│   ├── elf.c
+│   ├── gdt.c
+│   ├── gdt.s
+│   ├── idt.c
+│   ├── idt.s
+│   ├── initrd.c
+│   ├── ipc.c
+│   ├── keyboard.c
+│   ├── kmalloc.c
+│   ├── kmain.c
+│   ├── page_fault.c
+│   ├── paging.c
+│   ├── pic.c
+│   ├── pmm.c
+│   ├── serial.c
+│   ├── syscall.c
+│   ├── task.c
+│   ├── task_asm.s
+│   ├── timer.c
+│   ├── tss.c
+│   ├── uaccess.c
+│   ├── user_mode.s
+│   ├── user_test.c
+│   ├── vga.c
+│   └── vmm.c
+│
+├── user_prog.s
+├── user.ld
+├── linker.ld
+├── Makefile
+├── LICENSE
+├── SECURITY.md
+└── README.md
+```
+
+---
+
+# Boot Flow
+
+The initialization sequence can be summarized as:
+
+1. A Multiboot-compatible loader loads the kernel.
+2. `boot/boot.s` begins execution.
+3. The kernel stack is prepared.
+4. Control enters `kmain`.
+5. The Multiboot magic value is validated.
+6. The serial console is initialized.
+7. The VGA console is initialized.
+8. Multiboot modules are inspected.
+9. The initrd is registered.
+10. The GDT is loaded.
+11. The IDT is loaded.
+12. The PIC is configured.
+13. The PIT is configured.
+14. Keyboard support is initialized.
+15. The physical memory manager is initialized.
+16. The kernel heap is initialized.
+17. Paging and virtual memory are initialized.
+18. The task subsystem is initialized.
+19. Kernel tasks are created.
+20. User-space tasks are prepared.
+21. Interrupts are enabled.
+22. The scheduler starts running tasks.
+23. User-space code can execute in Ring 3 and invoke system calls.
+
+---
+
+# Memory Model
+
+The memory subsystem is structured approximately as:
+
+```text
+Physical Memory
+      |
+      v
+Physical Memory Manager
+      |
+      v
+Page Frames
+      |
+      v
+Paging
+      |
+      v
+Virtual Address Space
+      |
+      +------------------+
+      |                  |
+      v                  v
+   Kernel Space       User Space
+                         |
+                         v
+                    User Process
+```
+
+The kernel linker script places the kernel image at `1 MiB` and defines aligned `.text`, `.rodata`, `.data`, and `.bss` sections.
+
+---
+
+# Task and Scheduler Model
+
+The scheduler uses a static task table with a current limit of 32 task slots.
+
+Task states are:
+
+```text
+UNUSED
+READY
+RUNNING
+BLOCKED
+DEAD
+```
+
+The PIT timer interrupt provides the timing source for preemptive scheduling. This allows the scheduler to interrupt CPU-consuming tasks even when they do not voluntarily call `yield()`.
+
+The task subsystem also supports:
+
+* sleep
+* wake-up scheduling
+* idle task execution
+* kernel tasks
+* user tasks
+* per-task address spaces
+
+---
+
+# User Program
+
+The current user program is assembled from `user_prog.s`.
+
+Its basic execution model is:
+
+```text
+User Program
+    |
+    +-- SYS_WRITE
+    |
+    +-- SYS_READ
+    |
+    +-- Parse input
+    |
+    +-- help
+    |
+    +-- unknown command
+```
+
+The program implements an initial Ring 3 shell loop and uses `int 0x80` to request kernel services rather than accessing kernel functionality directly.
+
+---
+
+# Building
+
+## Requirements
+
+Typical build requirements include:
+
+* GCC
+* GNU binutils / linker
+* QEMU
+* GRUB tools for ISO creation
+* A Linux environment with 32-bit compilation support
+
+The Makefile currently uses flags such as:
+
+```text
+-m32
+-ffreestanding
+-fno-stack-protector
+-fno-pie
+-mno-red-zone
+```
+
+and links the kernel as a freestanding image without libc.
+
+---
+
+# Build the Kernel
+
+```bash
+make
+```
+
+Main output:
+
+```text
+firstos.bin
+```
+
+---
+
+# Run with QEMU
+
+```bash
+make run
+```
+
+The current `run` target builds the required initrd image and launches:
+
+```bash
+qemu-system-i386 -kernel firstos.bin -initrd initrd.img -serial stdio
+```
+
+as defined by the repository Makefile.
+
+---
+
+# Build an ISO
+
+```bash
+make iso
+```
+
+This target:
+
+1. builds the kernel
+2. builds the user program
+3. creates `initrd.img`
+4. creates the GRUB configuration
+5. generates a bootable ISO with `grub-mkrescue`
+
+Output:
+
+```text
+firstos.iso
+```
+
+---
+
+# Clean
+
+```bash
+make clean
+```
+
+This removes generated build artifacts including:
+
+```text
+*.o
+firstos.bin
+firstos.iso
+user_prog.elf
+initrd.img
+iso/
+```
+
+---
+
+# Debugging
+
+The kernel provides serial diagnostics alongside VGA console output.
+
+Typical boot messages include:
+
+```text
+[ ok ] multiboot verified
+[ ok ] kernel console ready
+[ ok ] initrd module loaded
+[info] initrd start: ...
+[info] initrd size: ...
+```
+
+The dual-console approach provides a practical debugging path during early boot and user-space initialization.
+
+---
+
+# Current Development Status
+
+firstOS is an experimental operating system kernel under active development.
+
+The repository currently covers a substantial portion of the early operating-system stack, from bootstrapping and hardware initialization through memory management, scheduling, privilege separation, system calls, IPC, and user-space execution.
+
+However, the implementation should still be considered experimental. Correctness, isolation, cleanup, hardware compatibility, and long-term API stability require additional work.
+
+---
+
+# Known Limitations
+
+The project currently has significant limitations, including:
+
+* 32-bit x86 only
+* not intended for production use
+* limited hardware driver support
+* no complete filesystem subsystem
+* early-stage user-space API
+* early-stage IPC implementation
+* ELF execution support is still under development
+* memory management is not production-grade
+* limited hardware compatibility
+* security guarantees are still under development
+
+Running firstOS on physical hardware should therefore be considered experimental.
+
+---
+
+# Roadmap
+
+Potential development directions include:
+
+## Kernel
+
+* improve memory management
+* improve page fault handling
+* improve process and task lifecycle management
+* improve resource cleanup
+* add synchronization primitives
+* improve timer abstraction
+* introduce a more structured driver architecture
+
+## User Space
+
+* improve ELF loading
+* improve process lifecycle
+* strengthen process isolation
+* introduce a user-space runtime
+* expand shell functionality
+* move test programs out of the kernel test layer
+
+## System Calls
+
+* stabilize the syscall ABI
+* add process management
+* add file abstractions
+* add memory mapping facilities
+* introduce process identifiers
+* improve error handling
+
+## IPC
+
+* improve message queues
+* add synchronization
+* formalize process-to-process communication
+* define stable IPC semantics
+
+## Storage
+
+* add block-device abstraction
+* add a filesystem
+* load executables from persistent storage
+* introduce a virtual filesystem layer
+
+---
+
+# Design Principles
+
+firstOS follows several design principles:
+
+### 1. Small and Understandable
+
+The system should remain small enough that the relationship between major components can be studied as a whole.
+
+### 2. Explicit Systems Programming
+
+The implementation should make CPU, memory, interrupt, and privilege mechanisms visible rather than hiding them behind unnecessary abstraction.
+
+### 3. Incremental Development
+
+Subsystems are implemented incrementally and validated before the system is expanded further.
+
+### 4. Kernel/User Separation
+
+Kernel and user-space execution should be separated through CPU privilege levels and address-space isolation.
+
+### 5. Testability
+
+Subsystems should provide diagnostics or dedicated test paths that make failures observable.
+
+---
+
+# License
+
+This project is licensed under the MIT License.
+
+See [LICENSE](LICENSE) for the full license text.
+
+---
+
+# Security
+
+Security-related information and the project's security policy are documented separately in [SECURITY.md](SECURITY.md).
+
+---
+
+# Repository
+
+Source code:
+
+https://github.com/chakronwork/Firstkernel
