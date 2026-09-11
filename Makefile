@@ -58,4 +58,9 @@ iso: $(BIN) initrd.img
 clean:
 	rm -rf $(OBJS) $(BIN) $(ISO) user_prog.elf initrd.img iso
 
-.PHONY: all iso clean
+
+
+run: $(BIN) initrd.img
+	qemu-system-i386 -kernel $(BIN) -initrd initrd.img -serial stdio
+
+.PHONY: all iso clean run

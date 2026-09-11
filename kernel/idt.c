@@ -492,19 +492,9 @@ struct registers *isr_handler(
     if (
         regs->int_no == 14U
     ) {
-
-        page_fault_handler(
+        return page_fault_handler(
             regs
         );
-
-
-        /*
-         * Page fault handler normally does not return
-         * for fatal faults.
-         *
-         * Return the same frame for completeness.
-         */
-        return regs;
     }
 
 

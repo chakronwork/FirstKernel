@@ -1,15 +1,16 @@
-#ifndef FIRSTOS_UACCESS_H
-#define FIRSTOS_UACCESS_H
+#ifndef UACCESS_H
+#define UACCESS_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-#define USER_SPACE_START 0x40000000U
-#define USER_SPACE_END   0x80000000U
+#define USER_SPACE_LIMIT 0xC0000000
 
-int uaccess_verify_read(const void *ptr, size_t size);
-int uaccess_verify_write(void *ptr, size_t size);
-int copy_from_user(void *dst, const void *src, size_t size);
-int copy_to_user(void *dst, const void *src, size_t size);
+bool is_user_range(const void *ptr, size_t size);
+bool uaccess_verify_read(const void *ptr, size_t size);
+bool uaccess_verify_write(const void *ptr, size_t size);
+int copy_from_user(void *dest, const void *src, size_t size);
+int copy_to_user(void *dest, const void *src, size_t size);
 
 #endif

@@ -9,6 +9,7 @@
 
 #define TASK_MAX 32U
 #define TASK_STACK_SIZE 4000U
+#define TASK_MAX_USER_PAGES 128U
 
 
 #define TASK_UNUSED  0U
@@ -71,6 +72,13 @@ struct task
     uint32_t user_stack_virtual;
     uint32_t user_stack_size;
 
+    /*
+     * Physical pages owned by this user process.
+     */
+    uint32_t user_page_count;
+    uint32_t user_page_physical[TASK_MAX_USER_PAGES];
+    uint32_t user_page_virtual[TASK_MAX_USER_PAGES];
+
     void (*entry)(
         void *arg
     );
@@ -92,6 +100,12 @@ uint32_t task_create(
 /*
  * Create a task whose saved context returns to CPL3.
  */
+int task_track_user_page(
+    struct task *task,
+    uint32_t virtual_address,
+    uint32_t physical_address
+);
+
 uint32_t task_create_user(
     uint32_t user_entry,
     uint32_t user_esp

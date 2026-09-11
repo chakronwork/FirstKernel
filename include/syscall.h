@@ -9,9 +9,10 @@
 #define SYS_SLEEP     4U
 #define SYS_IPC_SEND  5U
 #define SYS_IPC_RECV  6U
+#define SYS_READ      7U
 
 struct registers *syscall_dispatch(
     struct registers *regs
 );
 
-#endif /* SYSCALL_H */
+#endif

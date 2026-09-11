@@ -203,6 +203,21 @@ tasks[i].context.esp =
         tasks[i].user_stack_size =
             0;
 
+        tasks[i].user_page_count =
+            0;
+
+        for (
+            uint32_t j = 0;
+            j < TASK_MAX_USER_PAGES;
+            ++j
+        ) {
+            tasks[i].user_page_physical[j] =
+                0;
+
+            tasks[i].user_page_virtual[j] =
+                0;
+        }
+
         tasks[i].entry =
             0;
 
@@ -660,6 +675,21 @@ task->stack =
     task->user_stack_size =
         0;
 
+    task->user_page_count =
+        0;
+
+    for (
+        uint32_t i = 0;
+        i < TASK_MAX_USER_PAGES;
+        ++i
+    ) {
+        task->user_page_physical[i] =
+            0;
+
+        task->user_page_virtual[i] =
+            0;
+    }
+
     task->entry =
         entry;
 
@@ -708,6 +738,82 @@ task->stack =
 
 
     return task->id;
+}
+
+
+/*
+ * ============================================================
+ * User page ownership
+ * ============================================================
+ */
+
+int task_track_user_page(
+    struct task *task,
+    uint32_t virtual_address,
+    uint32_t physical_address
+)
+{
+    if (task == 0)
+        return 0;
+
+    if (physical_address == 0)
+        return 0;
+
+    if (
+        task->user_page_count >=
+        TASK_MAX_USER_PAGES
+    ) {
+        serial_write(
+            "[fail] task_track_user_page: limit reached\n"
+        );
+
+        return 0;
+    }
+
+    uint32_t index =
+        task->user_page_count;
+
+    task->user_page_physical[index] =
+        physical_address;
+
+    task->user_page_virtual[index] =
+        virtual_address;
+
+    task->user_page_count++;
+
+    return 1;
+}
+
+
+static void task_release_user_pages(
+    struct task *task
+)
+{
+    if (task == 0)
+        return;
+
+    for (
+        uint32_t i = 0;
+        i < task->user_page_count;
+        ++i
+    ) {
+        if (
+            task->user_page_physical[i] != 0
+        ) {
+            pmm_free_page(
+                task->user_page_physical[i]
+            );
+        }
+
+        task->user_page_physical[i] =
+            0;
+
+        task->user_page_virtual[i] =
+            0;
+    }
+
+    task->user_page_count =
+        0;
 }
 
 
@@ -837,6 +943,21 @@ uint32_t task_create_user(
     task->user_stack_size =
         0;
 
+    task->user_page_count =
+        0;
+
+    for (
+        uint32_t i = 0;
+        i < TASK_MAX_USER_PAGES;
+        ++i
+    ) {
+        task->user_page_physical[i] =
+            0;
+
+        task->user_page_virtual[i] =
+            0;
+    }
+
     task->entry =
         0;
 
@@ -962,28 +1083,18 @@ static void reap_dead_tasks(void)
         }
 
         /*
-         * User code page.
+         * Release every physical page owned by this
+         * user process.
+         *
+         * The address space itself does not own these
+         * physical frames.
          */
-        if (
-            task->user_code_physical != 0
-        ) {
-            if (
-                task->address_space != 0 &&
-                task->user_code_virtual != 0
-            ) {
-                address_space_unmap_page(
-                    task->address_space,
-                    task->user_code_virtual
-                );
-            }
+        task_release_user_pages(
+            task
+        );
 
-            pmm_free_page(
-                task->user_code_physical
-            );
-
-            task->user_code_physical =
-                0;
-        }
+        task->user_code_physical =
+            0;
 
         task->user_code_virtual =
             0;
@@ -991,29 +1102,8 @@ static void reap_dead_tasks(void)
         task->user_code_size =
             0;
 
-        /*
-         * User stack page.
-         */
-        if (
-            task->user_stack_physical != 0
-        ) {
-            if (
-                task->address_space != 0 &&
-                task->user_stack_virtual != 0
-            ) {
-                address_space_unmap_page(
-                    task->address_space,
-                    task->user_stack_virtual
-                );
-            }
-
-            pmm_free_page(
-                task->user_stack_physical
-            );
-
-            task->user_stack_physical =
-                0;
-        }
+        task->user_stack_physical =
+            0;
 
         task->user_stack_virtual =
             0;
@@ -1094,6 +1184,21 @@ static void reap_dead_tasks(void)
 
         task->user_mode =
             0;
+
+        task->user_page_count =
+            0;
+
+        for (
+            uint32_t j = 0;
+            j < TASK_MAX_USER_PAGES;
+            ++j
+        ) {
+            task->user_page_physical[j] =
+                0;
+
+            task->user_page_virtual[j] =
+                0;
+        }
 
         task->entry =
             0;
@@ -1804,9 +1909,7 @@ struct registers *task_scheduler_tick(
     ) {
         user_switch_log_count++;
 
-        serial_write(
-            "[sched] switched to Ring 3 task\n"
-        );
+        (void)0;
     }
 
 

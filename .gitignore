@@ -6,4 +6,5 @@ firstpatch.py
 all_diffs.txt
 *.bak
 *.bak.*
-cleanup_firstkernel.sh
+cleanup_firstkernel.shuser_prog.elf
+initrd.img
